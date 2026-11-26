@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+reports/
+WindowsDriveAudit/
+*.spec
+*.exe
+*.csv.zip

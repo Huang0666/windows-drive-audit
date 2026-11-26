@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>Windows 磁盘目录清册</title>
+<style>
+:root{color-scheme:light;--paper:#f4f6f8;--ink:#182934;--muted:#566977;--line:#d9e2e8;--navy:#15394e;--accent:#006a64}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.55 "Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif}
+main{max-width:1500px;margin:auto;padding:28px clamp(14px,3vw,48px) 52px}header{padding-bottom:18px;border-bottom:1px solid var(--line)}h1{font-size:clamp(23px,3vw,33px);margin:7px 0 4px;color:var(--navy);letter-spacing:-.025em}p{margin:6px 0}.muted{color:var(--muted)}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0}.metric{padding:10px 15px;background:white;border:1px solid var(--line);border-radius:7px}.metric strong{display:block;font-size:21px;color:var(--navy);font-variant-numeric:tabular-nums}.metric span{font-size:12px;color:var(--muted)}
+details{background:#eaf0f4;border:1px solid var(--line);padding:8px 12px;border-radius:7px;margin:0 0 20px}summary{cursor:pointer;color:var(--navy);font-weight:650}details p{max-width:100ch}
+.listing{background:#fff;border:1px solid var(--line);border-radius:9px;overflow:hidden}.filters{display:flex;flex-wrap:wrap;gap:10px;padding:13px;border-bottom:1px solid var(--line);align-items:end}.filters label{display:flex;flex-direction:column;gap:3px;color:var(--muted);font-size:12px}.search{flex:1 1 250px}.filters input,.filters select,button{min-height:36px;padding:6px 9px;border:1px solid #afc0ca;border-radius:5px;background:white;color:var(--ink);font:inherit}.filters input{width:100%;font-size:14px}.filters select{font-size:13px}button{cursor:pointer}button:hover:not(:disabled){background:#e8f3f2;border-color:#42948e}button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #006a64;outline-offset:2px}
+.navrow{padding:9px 13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--line)}#crumb{color:var(--navy);font-weight:650;overflow-wrap:anywhere}#counts{margin-left:auto;color:var(--muted);font-size:13px}
+.tablearea{overflow-x:auto}table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:880px}thead th{background:#244d64;color:white;text-align:left;font-weight:650;padding:8px 10px}tbody td{padding:9px 10px;border-bottom:1px solid #e4ebef;vertical-align:top;overflow-wrap:anywhere}tbody tr:nth-child(even){background:#f7f9fa}tbody tr:hover{background:#eef5f6}.path{font-weight:550}.size{font-variant-numeric:tabular-nums;font-weight:650;white-space:nowrap}.secondary{display:block;font-size:12px;color:var(--muted);margin-top:3px}.browse{display:inline-block;font-size:12px;min-height:24px;padding:1px 5px;margin:5px 0 0;border-color:#c4d4dc;color:var(--accent)}.tag{display:inline-block;border-radius:4px;background:#eff1f3;color:#485862;font-weight:650;padding:2px 5px;font-size:12px}.clean{background:#e1f1e7;color:#15533b}.verify{background:#fbf0d9;color:#714c08}.app{background:#e5eef9;color:#274c6c}
+.pager{padding:9px 13px;display:flex;justify-content:flex-end;gap:7px;align-items:center}.pager span{font-size:12px;color:var(--muted);margin-right:6px}.error{padding:13px;color:#902e29}
+@media(max-width:650px){main{padding-top:16px}.metrics{grid-template-columns:repeat(2,1fr)}.navrow #counts{width:100%;margin:0}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1 id="title">Windows 磁盘目录清册</h1>
+    <p id="subtitle" class="muted">正在读取扫描结果…</p>
+  </header>
+  <div class="metrics" aria-label="磁盘占用">
+    <div class="metric"><strong id="used">—</strong><span>Windows 报告已用</span></div>
+    <div class="metric"><strong id="free">—</strong><span>可用空间</span></div>
+    <div class="metric"><strong id="located">—</strong><span id="located-label">已定位文件占用</span></div>
+    <div class="metric"><strong id="gap">—</strong><span>未定位到具体文件</span></div>
+  </div>
+  <details>
+    <summary>占用数字与清理建议怎么读</summary>
+    <p>含子目录占用显示当前目录和下层文件的合计。往下打开目录就会看到其中的明细。要相加时使用「仅本层」列。NTFS 硬链接对应同一份文件时，实际占用只分配给首次扫描到的路径。</p>
+    <p>目录名线索是按名称推断。一个目录同时含程序、设置、个人文件和缓存时，请查看下层目录。读取有缺项时，表中仅显示可见部分。链接与挂载点列出本身，目标可能位于另一个盘。盘级差额也可能包含 NTFS 维护数据。</p>
+    <p>「可重建或旧残留」的具体条件在每行。系统文件可从 Windows 设置的「系统 → 存储 → 临时文件」核对，应用程序使用各自的卸载入口。</p>
+  </details>
+  <section class="listing" aria-label="目录明细">
+    <div class="filters">
+      <label class="search">查找路径或软件<input id="query" type="search" placeholder="例如 AppData、WinSxS、Chrome"></label>
+      <label>处理建议<select id="category"><option value="">全部</option></select></label>
+      <label>排序<select id="sort"><option value="size">占用从大到小</option><option value="path">按目录路径</option></select></label>
+      <button id="reset" type="button">返回盘符根目录</button>
+    </div>
+    <div class="navrow"><button id="up" type="button">上一级</button><span id="crumb">—</span><span id="counts" role="status"></span></div>
+    <p id="failure" class="error" hidden></p>
+    <div class="tablearea"><table>
+      <colgroup><col style="width:34%"><col style="width:17%"><col style="width:13%"><col style="width:36%"></colgroup>
+      <thead><tr><th scope="col">完整目录路径</th><th scope="col">所属软件或用途</th><th scope="col">含子目录占用</th><th scope="col">处理建议与依据</th></tr></thead>
+      <tbody id="records"></tbody>
+    </table></div>
+    <div class="pager"><span id="pages"></span><button id="prev" type="button">上一页</button><button id="next" type="button">下一页</button></div>
+  </section>
+</main>
+<script id="payload" type="application/octet-stream">__INVENTORY_DATA__</script>
+<script>
+"use strict";
+const byId = id => document.getElementById(id);
+const perPage = 80;
+let model, children, all, rootPath, current = 0, page = 0, matches = [], timer;
+const bytes = n => n === 0 ? "0 B" : n < 2**20 ? `${(n/1024).toFixed(1)} KiB` : n < 2**30 ? `${(n/2**20).toFixed(1)} MiB` : `${(n/2**30).toFixed(2)} GiB`;
+const gib = n => `${(n/2**30).toFixed(2)} GiB`;
+const number = n => n.toLocaleString("zh-CN");
+const rule = row => model.labels[row[9]];
+
+function addCell(tr, text, className) {
+  const td = document.createElement("td");
+  if (className) td.className = className;
+  if (text) td.textContent = text;
+  tr.append(td);
+  return td;
+}
+function secondary(cell, text) {
+  const small = document.createElement("span");
+  small.className = "secondary";
+  small.textContent = text;
+  cell.append(small);
+}
+function visit(index) {
+  current = index;
+  byId("query").value = "";
+  byId("category").value = "";
+  refresh();
+}
+function render() {
+  const pageCount = Math.max(1, Math.ceil(matches.length/perPage));
+  page = Math.min(page, pageCount - 1);
+  const fragment = document.createDocumentFragment();
+  const found = matches.slice(page*perPage,(page+1)*perPage);
+  if (!found.length) {
+    const tr = document.createElement("tr");
+    const td = addCell(tr, "此范围没有符合条件的子目录或搜索结果。");
+    td.colSpan = 4;
+    fragment.append(tr);
+  }
+  for (const index of found) {
+    const row = model.rows[index];
+    const tr = document.createElement("tr");
+    const pathCell = addCell(tr, rootPath + row[0], "path");
+    if (children[index]?.length) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "browse";
+      button.textContent = `查看 ${number(children[index].length)} 个子目录`;
+      button.addEventListener("click",() => visit(index));
+      pathCell.append(document.createElement("br"),button);
+    }
+    const [owner, basis, decision, reason] = rule(row);
+    const ownerCell = addCell(tr,owner);
+    secondary(ownerCell,basis);
+    const sizeCell = addCell(tr,"");
+    const mainSize = document.createElement("span");
+    mainSize.className = "size";
+    mainSize.textContent = row[4] || row[2] === "已读取" ? bytes(row[4]) : "未核实";
+    sizeCell.append(mainSize);
+    if (row[2] !== "链接或挂载点") secondary(sizeCell,`仅本层 ${bytes(row[3])}`);
+    if (row[5] !== row[4]) secondary(sizeCell,`按路径 ${bytes(row[5])}`);
+    const decisionCell=addCell(tr,"");
+    const badge=document.createElement("span");
+    const style=decision==="可重建或旧残留" ? "clean" : /确认|备份|权限/.test(decision) ? "verify" : /应用|Windows/.test(decision) ? "app" : "";
+    badge.className=`tag ${style}`;
+    badge.textContent=decision;
+    decisionCell.append(badge);
+    secondary(decisionCell,reason);
+    if (row[2] !== "已读取") secondary(decisionCell,row[2]);
+    if (row[7] || row[8]) secondary(decisionCell,`本树读取有缺项 ${number(row[7])} 个，未展开链接 ${number(row[8])} 个`);
+    fragment.append(tr);
+  }
+  byId("records").replaceChildren(fragment);
+  byId("pages").textContent=`第 ${page+1} / ${pageCount} 页`;
+  byId("prev").disabled=page===0;
+  byId("next").disabled=page+1>=pageCount;
+}
+function refresh() {
+  if (!model) return;
+  const search=byId("query").value.trim().replaceAll("/","\\").toLowerCase();
+  const decision=byId("category").value;
+  const global=Boolean(search || decision);
+  const available=global ? all : children[current] || [];
+  matches=available.filter(i=>{
+    const row=model.rows[i];
+    const [owner,basis,status]=rule(row);
+    return (!decision || status===decision) && (!search || (rootPath+row[0]).toLowerCase().includes(search) || owner.toLowerCase().includes(search) || basis.toLowerCase().includes(search));
+  });
+  if(byId("sort").value==="size") matches.sort((a,b)=>model.rows[b][4]-model.rows[a][4] || a-b);
+  else matches.sort((a,b)=>model.rows[a][0].localeCompare(model.rows[b][0],"zh-CN"));
+  byId("crumb").textContent=global ? "全盘搜索结果" : rootPath+model.rows[current][0];
+  byId("counts").textContent=`${number(matches.length)} 个目录${global ? "" : " · 当前层"}`;
+  byId("up").disabled=global || current===0;
+  page=0;
+  render();
+}
+async function init() {
+  const payload=byId("payload");
+  const input=Uint8Array.from(atob(payload.textContent.trim()),c=>c.charCodeAt(0));
+  const stream=new Blob([input]).stream().pipeThrough(new DecompressionStream("gzip"));
+  model=await new Response(stream).json();
+  rootPath=model.root;
+  payload.remove();
+  children=new Array(model.rows.length);
+  all=[];
+  for(let i=1;i<model.rows.length;i++) {
+    const parent=model.rows[i][1];
+    (children[parent]??=[]).push(i);
+    all.push(i);
+  }
+  const [total,used,free]=model.volume;
+  const [,,,,located,,,errors,links]=model.rows[0];
+  document.title=byId("title").textContent=`${rootPath.slice(0,2)} 目录逐项清册`;
+  byId("used").textContent=gib(used);
+  byId("free").textContent=gib(free);
+  byId("located").textContent=gib(located);
+  byId("located-label").textContent=model.allocated ? "已定位文件占用" : "已统计的逻辑文件大小";
+  byId("gap").textContent=model.allocated ? gib(used-located) : "不适用";
+  byId("subtitle").textContent=`${model.day} 只读扫描 · ${model.filesystem} · ${number(all.length)} 个目录 · 总容量 ${gib(total)} · ${number(errors)} 个目录读取有缺项 · ${number(links)} 个链接或挂载点`;
+  for(const category of new Set(model.labels.map(item=>item[2]))) byId("category").add(new Option(category,category));
+  byId("query").addEventListener("input",()=>{clearTimeout(timer);timer=setTimeout(refresh,200);});
+  byId("category").addEventListener("change",refresh);
+  byId("sort").addEventListener("change",refresh);
+  byId("reset").addEventListener("click",()=>visit(0));
+  byId("up").addEventListener("click",()=>visit(model.rows[current][1]));
+  byId("prev").addEventListener("click",()=>{page--;render();});
+  byId("next").addEventListener("click",()=>{page++;render();});
+  refresh();
+}
+init().catch(()=>{
+  byId("subtitle").textContent="浏览器无法打开此清册。";
+  byId("failure").hidden=false;
+  byId("failure").textContent="请用最新版 Edge 或 Chrome 打开本地 HTML，或者解压随附的 CSV，用 Excel 查看全部目录。";
+});
+</script>
+</body>
+</html>
